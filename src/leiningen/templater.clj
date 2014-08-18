@@ -95,7 +95,7 @@ returns true if the file has an override path defined in the template project se
   (map (juxt (fn [file]
                (-> file
                    .getAbsolutePath
-                   (str/replace root "")
+                   (str/replace (str root "/") "")
                    (replace-template-var (sanitize name) "sanitized")))
              (fn [file]
                (seq ['render (unhide (.getName file)) 'data])))
