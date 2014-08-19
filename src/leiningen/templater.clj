@@ -7,8 +7,8 @@
             [clojure.walk :as w]
             [rewrite-clj.zip :as z]
             [rewrite-clj.parser :as p]
-            [rewrite-clj.printer :as prn])
-  (:use [cfg.current]))
+            [rewrite-clj.printer :as prn]
+            [leiningen.core.main :as main]))
 
 ;; ===== general utils =====
 
@@ -42,52 +42,49 @@
 
 (defn get-rel-path
   "returns the path of the file relative to the project root"
-  [file]
+  [file {:keys [root]}]
   (-> file
       .getAbsolutePath
-      (str/replace (str (:root @project) "/") "")))
+      (str/replace (str root "/") "")))
 
 (defn is-template-project?
   "returns true if the file is the project file for the new template"
-  [file]
-  (let [out (get-in @project [:template :output-dir])]
-    (= (get-rel-path file) (str out "/project.clj"))))
+  [file project]
+  (let [out (get-in project [:template :output-dir])]
+    (= (get-rel-path file project) (str out "/project.clj"))))
 
 (defn is-overridden?
   "takes either keys or vals from file-overrides and returns a function that
 returns true if the file has an override path defined in the template project settings"
-  [file loc]
-  (let [{:keys [root template]} @project
-        f (condp = loc
+  [file loc {:keys [root template] :as project}]
+  (let [f (condp = loc
             :project vals
             :template keys)]
-    (contains? (set (f (:file-overrides template))) (get-rel-path file))))
+    (contains? (set (f (:file-overrides template))) (get-rel-path file project))))
 
 (defn get-override
   "returns the overwritten file defined in :template in project"
-  [file]
-  (->> file
-       get-rel-path
+  [file project]
+  (->> (get-rel-path file project)
        (conj [:template :file-overrides])
-       (get-in @project)
+       (get-in project)
        io/file))
 
 (defn file-or-override
   "returns either the file or its defined override"
-  [file]
+  [file project]
   (cond-> file
-          (is-overridden? file :template) get-override))
+          (is-overridden? file :template project) (get-override project)))
 
-(defn get-project-files
+(defn get-files
   "returns all files in the project that are not ignored by git"
-  []
-  (let [{:keys [root template]} @project]
-    (->> root
-         io/file
-         file-seq
-         (filter (complement gitignored?))
-         (filter #(not (is-overridden? % :project)))
-         (filter #(.isFile %)))))
+  [{:keys [root template] :as project}]
+  (->> root
+       io/file
+       file-seq
+       (filter (complement gitignored?))
+       (filter #(not (is-overridden? % :project project)))
+       (filter #(.isFile %))))
 
 ;; ===== lein utils =====
 
@@ -171,36 +168,35 @@ returns true if the file has an override path defined in the template project se
 
 (defn build-renderers
   "builds a vector of file renderers"
-  [files]
-  (let [{:keys [root name] :as project} @project]
-    (map (juxt (fn [file]
-                 (-> file
-                     .getAbsolutePath
-                     (str/replace (str root "/") "")
-                     (replace-template-var (sanitize name) "sanitized")))
-               (fn [file]
-                 (seq ['render (unhide (.getName file)) 'data])))
-         files)))
+  [files {:keys [root name]}]
+  (map (juxt (fn [file]
+               (-> file
+                   .getAbsolutePath
+                   (str/replace (str root "/") "")
+                   (replace-template-var (sanitize name) "sanitized")))
+             (fn [file]
+               (seq ['render (unhide (.getName file)) 'data])))
+       files))
 
 (defn zip-renderer
   "builds the renderer file from the root zipper"
-  [root]
+  [root project]
   (-> root
       z/down
       (z/find-value z/next 'main/info)
       z/right
-      (z/replace (get-in @project [:template :msg]))
+      (z/replace (get-in project [:template :msg]))
       z/up
       (z/find-value z/next '->files)
       z/rightmost
       z/remove
       z/up
-      (append-children (build-renderers (get-project-files)))))
+      (append-children (build-renderers (get-files project) project))))
 
 (defn zip-template-proj
   "replaces template project values with those defined in :template in project.clj"
-  [root]
-  (let [{:keys [title version project]} (:template @project)]
+  [root project]
+  (let [{:keys [title version project]} (:template project)]
     (-> root
        z/down
        (z/find-value z/next "0.1.0-SNAPSHOT")
@@ -208,15 +204,10 @@ returns true if the file has an override path defined in the template project se
        z/up
        (#(apply assoc-proj % (flatten (seq project)))))))
 
-#_(-> (str (:root @project) "/lein-template/project.clj")
-    slurp
-    (zip-file-string zip-template-proj)
-    print)
-
 (defn process-file
   "processes the file based on file type, name, and context"
-  [file]
-  (let [title (get-in @project [:template :title])
+  [file project]
+  (let [title (get-in project [:template :title])
         [type & filename] (-> (.getName file)
                               (str/split #"\.")
                               reverse)
@@ -225,16 +216,16 @@ returns true if the file has an override path defined in the template project se
         file-str (-> file
                      .getAbsolutePath
                      slurp)
-        template #(replace-template-var % (:name @project) "name")]
+        template #(replace-template-var % (:name project) "name")]
     (m/match [filename type]
-             ["project" "clj"] (if (is-template-project? file)
+             ["project" "clj"] (if (is-template-project? file project)
                                  (-> file-str
-                                     (zip-file-string zip-template-proj))
+                                     (zip-file-string #(zip-template-proj % project)))
                                  (-> file-str
                                      template
                                      (zip-file-string #(dissoc-proj % :template))))
              [filename #"clj"] (if (= title filename)
-                                 (zip-file-string file-str zip-renderer)
+                                 (zip-file-string file-str #(zip-renderer % project))
                                  (template file-str))
              :else file-str)))
 
@@ -242,9 +233,8 @@ returns true if the file has an override path defined in the template project se
 
 (defn templater
   "creates a new line template from the current project and the :template map in project.clj"
-  []
-  (let [{:keys [name root template] :as proj} @project
-        {:keys [output-dir title readme]} template
+  [{:keys [name root template] :as project}]
+  (let [{:keys [output-dir title]} template
 
         target-dir (str root "/" output-dir)
         lein-dir (str target-dir "/src/leiningen/new/")
@@ -266,6 +256,6 @@ returns true if the file has an override path defined in the template project se
                                                    .getName
                                                    unhide
                                                    (str src-dir)))
-                                            file-or-override)
-                                      (get-project-files)))]
-      (spit path (process-file file)))))
+                                            #(file-or-override % project))
+                                      (get-files project)))]
+      (spit path (process-file file project)))))
