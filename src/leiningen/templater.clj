@@ -187,7 +187,7 @@ returns true if the file has an override path defined in the template project se
       z/down
       (z/find-value z/next 'main/info)
       z/right
-      (z/replace (get-in project [:template :msg]))
+      (z/edit #(or (get-in project [:template :msg] %)))
       z/up
       (z/find-value z/next '->files)
       z/rightmost
@@ -238,8 +238,12 @@ returns true if the file has an override path defined in the template project se
 
 (defn templater
   "creates a new line template from the current project and the :template map in project.clj"
-  [{:keys [name root template] :as project}]
-  (let [{:keys [output-dir title]} template
+  [{:keys [name root version] :as project}]
+  (let [defaults {:title name
+                  :version version
+                  :output-dir "lein-template"}
+        project (update-in project [:template] #(merge defaults %))
+        {:keys [output-dir title]} (:template project)
 
         target-dir (str root "/" output-dir)
         lein-dir (str target-dir "/src/leiningen/new/")
@@ -248,7 +252,7 @@ returns true if the file has an override path defined in the template project se
         path-file (juxt identity
                         io/file)
         replace-file (fn [render-path key]
-                       [render-path (io/file (or (get template key) render-path))])]
+                       [render-path (io/file (or (get-in project [:template key]) render-path))])]
 
     (fresh-template title target-dir)
 
