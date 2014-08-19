@@ -9,21 +9,21 @@ Leiningen ([via Clojars](https://clojars.org/lein-templater))
 Put one of the following into the ```:plugins``` vector of the ```:user``` profile in your ```~/.lein/profiles.clj```:
 
 ```
-[lein-ancient "0.1.0-SNAPSHOT"]
+[lein-ancient "0.1.0"]
 ```
 
 ## Make Templates
 
 ```lein templater``` will generate a new template that will render all of the files in your current project (excluding those that are gitignored) into their appropriate directories, with your project's name properly replaced.
 
-lein-tempater looks for a ```:template``` key in ```project.clj```
+lein-tempater looks for a an optional ```:template``` key in ```project.clj```.
 
 Below is a list of understood keys
 
 ```clojure
-{:title "my-template" ;; the template's title to be used with lein new
- :output-dir "lein-template" ;; the relative path where the template will be generated
- :version "0.1.0-SNAPSHOT" ;; the version number of your current template
+{:title "project-title" ;; the template's title to be used with lein new. defaults to same as project
+ :output-dir "lein-template" ;; the relative path where the template will be generated. defaults to lein-template
+ :version "0.1.0-SNAPSHOT" ;; the version number of your current template. defaults to same as project
  :msg "Making a new template based on my-template!" ;; a msg to be output when someone uses your template
  :readme "resources/README.template.md" ;; the relative path to a file that will serve as the template's (not the readme of a project generated from the template)
  :license "resources/LICENSE" ;; same as readme

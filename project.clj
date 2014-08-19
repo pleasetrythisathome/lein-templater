@@ -1,4 +1,4 @@
-(defproject lein-templater "0.1.0-SNAPSHOT"
+(defproject lein-templater "0.1.0"
   :description "A leiningen plugin for creating leiningen templates "
   :url "https://github.com/pleasetrythisathome/lein-templater"
   :license {:name "Eclipse Public License"
