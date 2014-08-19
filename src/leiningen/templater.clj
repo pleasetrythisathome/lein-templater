@@ -94,6 +94,7 @@ returns true if the file has an override path defined in the template project se
   (str/replace s match (str "{{" var "}}")))
 
 (defn fresh-template [title dir]
+  (main/info (str "Generating a template: " title ", at: " dir))
   (sh "rm" "-rf" dir)
   (sh "lein" "new" "template" title "--to-dir" dir)
   (sh "rm" (str dir "/src/leiningen/new/" title "/foo.clj")))
@@ -181,6 +182,7 @@ returns true if the file has an override path defined in the template project se
 (defn zip-renderer
   "builds the renderer file from the root zipper"
   [root project]
+  (main/info "Building template renderer")
   (-> root
       z/down
       (z/find-value z/next 'main/info)
@@ -196,6 +198,7 @@ returns true if the file has an override path defined in the template project se
 (defn zip-template-proj
   "replaces template project values with those defined in :template in project.clj"
   [root project]
+  (main/info "Merging values into template's project.clj")
   (let [{:keys [title version project]} (:template project)]
     (-> root
        z/down
@@ -247,15 +250,21 @@ returns true if the file has an override path defined in the template project se
 
     (fresh-template title target-dir)
 
-    (doseq [[path file] (concat [(path-file (str lein-dir title ".clj"))
-                                 (path-file (str target-dir "/project.clj"))
-                                 (replace-file (str target-dir "/README.md") :readme)
-                                 (replace-file (str target-dir "/LICENSE") :license)]
-                                (mapv (juxt (fn [file]
+    (doseq [[path file] (concat (mapv (juxt (fn [file]
                                               (->> file
                                                    .getName
                                                    unhide
                                                    (str src-dir)))
                                             #(file-or-override % project))
-                                      (get-files project)))]
-      (spit path (process-file file project)))))
+                                      (get-files project))
+                                [(path-file (str lein-dir title ".clj"))
+                                 (path-file (str target-dir "/project.clj"))
+                                 (replace-file (str target-dir "/README.md") :readme)
+                                 (replace-file (str target-dir "/LICENSE") :license)])]
+      (main/info "Processing project files")
+      (spit path (process-file file project))))
+  (main/info (str "Template: " title ", generated successfully!"))
+  (main/info "To test your new template,")
+  (main/info (str "cd " target-dir))
+  (main/info "lein install")
+  (main/info (str "lein new " title " my-test-project")))
