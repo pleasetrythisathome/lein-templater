@@ -65,10 +65,10 @@ returns true if the file has an override path defined in the template project se
 (defn get-override
   "returns the overwritten file defined in :template in project"
   [file project]
-  (->> (get-rel-path file project)
-       (conj [:template :file-overrides])
-       (get-in project)
-       io/file))
+  (when-let [path (->> (get-rel-path file project)
+                   (conj [:template :file-overrides])
+                   (get-in project))]
+    (io/file path)))
 
 (defn file-or-override
   "returns either the file or its defined override"
@@ -94,7 +94,7 @@ returns true if the file has an override path defined in the template project se
   (str/replace s match (str "{{" var "}}")))
 
 (defn fresh-template [title dir]
-  (main/info (str "Generating a template: " title ", at: " dir))
+  (main/info (str "Generating template: " title ", at: " dir))
   (sh "rm" "-rf" dir)
   (sh "lein" "new" "template" title "--to-dir" dir)
   (sh "rm" (str dir "/src/leiningen/new/" title "/foo.clj")))
@@ -169,7 +169,7 @@ returns true if the file has an override path defined in the template project se
 
 (defn build-renderers
   "builds a vector of file renderers"
-  [files {:keys [root name]}]
+  [{:keys [root name]} files]
   (map (juxt (fn [file]
                (-> file
                    .getAbsolutePath
@@ -193,7 +193,9 @@ returns true if the file has an override path defined in the template project se
       z/rightmost
       z/remove
       z/up
-      (append-children (build-renderers (get-files project) project))))
+      (append-children (->> (get-files project)
+                            (filter #(file-or-override % project))
+                            (build-renderers project)))))
 
 (defn zip-template-proj
   "replaces template project values with those defined in :template in project.clj"
@@ -250,21 +252,17 @@ returns true if the file has an override path defined in the template project se
 
     (fresh-template title target-dir)
 
-    (doseq [[path file] (concat (mapv (juxt (fn [file]
-                                              (->> file
-                                                   .getName
-                                                   unhide
-                                                   (str src-dir)))
-                                            #(file-or-override % project))
-                                      (get-files project))
+    (main/info "Processing project files")
+    (doseq [[path file] (concat (filter second (mapv (juxt (fn [file]
+                                                             (->> file
+                                                                  .getName
+                                                                  unhide
+                                                                  (str src-dir)))
+                                                           #(file-or-override % project))
+                                                     (get-files project)))
                                 [(path-file (str lein-dir title ".clj"))
                                  (path-file (str target-dir "/project.clj"))
                                  (replace-file (str target-dir "/README.md") :readme)
                                  (replace-file (str target-dir "/LICENSE") :license)])]
-      (main/info "Processing project files")
-      (spit path (process-file file project))))
-  (main/info (str "Template: " title ", generated successfully!"))
-  (main/info "To test your new template,")
-  (main/info (str "cd " target-dir))
-  (main/info "lein install")
-  (main/info (str "lein new " title " my-test-project")))
+      (spit path (process-file file project)))
+    (main/info "Template generated successfully!")))
