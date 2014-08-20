@@ -9,7 +9,7 @@ Leiningen ([via Clojars](https://clojars.org/lein-templater))
 Put one of the following into the ```:plugins``` vector of the ```:user``` profile in your ```~/.lein/profiles.clj```:
 
 ```
-[lein-ancient "0.1.0"]
+[lein-ancient "0.1.1-SNAPSHOT"]
 ```
 
 ## Make Templates

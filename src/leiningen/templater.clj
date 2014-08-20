@@ -156,12 +156,15 @@ returns true if the file has an override path defined in the template project se
             (-> root
                 z/down
                 (z/find-value z/next key)
-                z/remove
-                z/next
-                z/remove
-                z/next
-                z/up
-                z/up))
+                (#(if %
+                    (-> %
+                        z/remove
+                        z/next
+                        z/remove
+                        z/next
+                        z/up
+                        z/up)
+                    root))))
           root
           keys))
 
@@ -247,7 +250,7 @@ returns true if the file has an override path defined in the template project se
 
         target-dir (str root "/" output-dir)
         lein-dir (str target-dir "/src/leiningen/new/")
-        src-dir (str lein-dir title "/")
+        src-dir (str lein-dir (sanitize title) "/")
 
         path-file (juxt identity
                         io/file)
@@ -264,7 +267,7 @@ returns true if the file has an override path defined in the template project se
                                                                   (str src-dir)))
                                                            #(file-or-override % project))
                                                      (get-files project)))
-                                [(path-file (str lein-dir title ".clj"))
+                                [(path-file (str lein-dir (sanitize title) ".clj"))
                                  (path-file (str target-dir "/project.clj"))
                                  (replace-file (str target-dir "/README.md") :readme)
                                  (replace-file (str target-dir "/LICENSE") :license)])]
