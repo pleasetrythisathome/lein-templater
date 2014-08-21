@@ -232,7 +232,7 @@ returns true if the file has an override path defined in the template project se
                                  (-> file-str
                                      template
                                      (zip-file-string #(dissoc-proj % :template))))
-             [filename #"clj"] (if (= title filename)
+             [filename #"clj"] (if (= (sanitize title) filename)
                                  (zip-file-string file-str #(zip-renderer % project))
                                  (template file-str))
              :else file-str)))
@@ -249,8 +249,8 @@ returns true if the file has an override path defined in the template project se
         {:keys [output-dir title]} (:template project)
 
         target-dir (str root "/" output-dir)
-        lein-dir (str target-dir "/src/leiningen/new/")
-        src-dir (str lein-dir (sanitize title) "/")
+        lein-dir (str target-dir "/src/leiningen/new")
+        src-dir (str lein-dir "/" (sanitize title) "/")
 
         path-file (juxt identity
                         io/file)
@@ -267,7 +267,7 @@ returns true if the file has an override path defined in the template project se
                                                                   (str src-dir)))
                                                            #(file-or-override % project))
                                                      (get-files project)))
-                                [(path-file (str lein-dir (sanitize title) ".clj"))
+                                [(path-file (str lein-dir "/" (sanitize title) ".clj"))
                                  (path-file (str target-dir "/project.clj"))
                                  (replace-file (str target-dir "/README.md") :readme)
                                  (replace-file (str target-dir "/LICENSE") :license)])]
