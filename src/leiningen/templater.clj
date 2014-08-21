@@ -224,7 +224,12 @@ returns true if the file has an override path defined in the template project se
         file-str (-> file
                      .getAbsolutePath
                      slurp)
-        template #(replace-template-var % (:name project) "name")]
+        template (fn [fs]
+                   (let [name (:name project)
+                         sanitized (sanitize name)]
+                     (-> fs
+                         (replace-template-var name "name")
+                         (replace-template-var sanitized "sanitized"))))]
     (m/match [filename type]
              ["project" "clj"] (if (is-template-project? file project)
                                  (-> file-str
