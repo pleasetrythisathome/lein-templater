@@ -235,7 +235,7 @@ returns true if the file has an override path defined in the template project se
              [filename #"clj"] (if (= (sanitize title) filename)
                                  (zip-file-string file-str #(zip-renderer % project))
                                  (template file-str))
-             :else file-str)))
+             :else (template file-str))))
 
 ;; ===== let's make templates! =====
 
